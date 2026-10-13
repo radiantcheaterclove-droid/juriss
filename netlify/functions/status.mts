@@ -1,8 +1,8 @@
-import { keyOk, listModels, friendly } from "./gemini.ts";
+import { provedor, nomeProvedor, listModels, friendly } from "./llm.ts";
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { "content-type": "application/json" } });
 export default async () => {
-  if (!keyOk()) return json({ configurada: false, modelos: [], mensagem: "GEMINI_API_KEY não está definida no Netlify." });
-  try { return json({ configurada: true, modelos: await listModels(), mensagem: "Conexão com o Gemini funcionando." }); }
-  catch (e: any) { return json({ configurada: true, modelos: [], mensagem: friendly(e) }, 200); }
+  if (!provedor()) return json({ configurada: false, provedor: "nenhum", modelos: [], mensagem: "Nenhuma chave de IA configurada. Defina GROQ_API_KEY no Netlify." });
+  try { return json({ configurada: true, provedor: nomeProvedor(), modelos: await listModels(), mensagem: `Conexão com ${nomeProvedor()} funcionando.` }); }
+  catch (e: any) { return json({ configurada: true, provedor: nomeProvedor(), modelos: [], mensagem: friendly(e) }); }
 };
 export const config = { path: "/api/status" };

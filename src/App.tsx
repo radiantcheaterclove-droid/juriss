@@ -32,7 +32,7 @@ export default function App() {
 }
 const Painel = ({ st, rels, ir, abrir }: { st: any; rels: Relatorio[]; ir: (a: string) => void; abrir: (r: Relatorio) => void }) => (<section><h2>Painel</h2>
   <div className="grid"><div className="card"><h3>Documentos</h3>{docsInfo.length ? docsInfo.map((d) => <p key={d.key}>{d.arquivo}: {d.artigos} artigos {d.avisos.length ? "⚠" : "✔"}</p>) : <p className="err">Nenhum documento indexado.</p>}</div>
-    <div className="card"><h3>IA (Gemini)</h3><p className={st?.configurada && st.modelos.length ? "ok" : "err"}>{st ? st.mensagem : "Verificando…"}</p></div></div>
+    <div className="card"><h3>Serviço de IA</h3><p className={st?.configurada && st.modelos.length ? "ok" : "err"}>{st ? st.mensagem : "Verificando…"}</p></div></div>
   <button className="primary" onClick={() => ir("nova")}>Iniciar nova análise</button>
   <h3>Relatórios recentes</h3>{rels.length ? rels.slice(0, 5).map((r) => <p key={r.id}><a href="#" onClick={(e) => { e.preventDefault(); abrir(r); }}>{r.titulo}</a> <small>{new Date(r.geradoEm).toLocaleString("pt-BR")}</small></p>) : <p className="muted">Nenhum relatório ainda. Comece uma nova análise.</p>}</section>);
 
@@ -55,7 +55,7 @@ function Nova({ modelos, pronto, onOk }: { modelos: string[]; pronto: boolean; o
     <label>Provas ou trechos de apoio (opcional)<textarea rows={3} onChange={set("provas")} /></label>
     <div className="row"><label>Modelo<select value={f.modelo || ""} onChange={set("modelo")}><option value="">Automático</option>{modelos.map((m) => <option key={m}>{m}</option>)}</select></label>
       <label>Criatividade ({f.temperatura})<input type="range" min="0" max="1" step="0.1" value={f.temperatura} onChange={(e) => setF({ ...f, temperatura: +e.target.value })} /></label></div>
-    <label className="chk"><input type="checkbox" checked={ciente} onChange={(e) => setCiente(e.target.checked)} /> Estou ciente de que o texto acima e os artigos relevantes serão enviados ao Google Gemini para processamento.</label>
+    <label className="chk"><input type="checkbox" checked={ciente} onChange={(e) => setCiente(e.target.checked)} /> Estou ciente de que o texto acima e os artigos relevantes serão enviados ao serviço de IA configurado (Groq) para processamento.</label>
     {erro && <p className="err" role="alert">{erro}</p>}
     <button className="primary" disabled={!ciente || busy || !pronto} onClick={enviar}>{busy ? "Analisando…" : "Gerar análise"}</button></section>);
 }
@@ -93,5 +93,5 @@ const Hist = ({ rels, abrir, apagar }: { rels: Relatorio[]; abrir: (r: Relatorio
 const Api = ({ st, testar }: { st: any; testar: () => void }) => (<section><h2>Configuração de IA</h2>
   <p className={st?.configurada && st.modelos.length ? "ok" : "err"}>{st ? st.mensagem : "Verificando…"}</p><button onClick={testar}>Testar conexão</button>
   {st?.modelos?.length > 0 && <><h3>Modelos disponíveis para sua chave</h3><ul>{st.modelos.map((m: string) => <li key={m}>{m}</li>)}</ul></>}
-  <h3>Como configurar (uma vez)</h3><ol><li>Acesse <b>aistudio.google.com/apikey</b> e crie uma chave gratuita.</li><li>No Netlify: <b>Site configuration → Environment variables → Add a variable</b>.</li><li>Nome: <code>GEMINI_API_KEY</code>; valor: sua chave. Salve.</li><li>Em <b>Deploys → Trigger deploy</b>, faça um novo deploy e volte aqui para testar.</li></ol>
-  <p className="muted">A chave fica apenas no servidor do Netlify. O plano gratuito tem limites de uso que o Google pode alterar.</p></section>);
+  <h3>Como configurar (uma vez)</h3><ol><li>Acesse <b>console.groq.com/keys</b>, entre com seu e-mail ou Google e clique em <b>Create API Key</b>. Copie a chave.</li><li>No Netlify: <b>Site configuration → Environment variables → Add a variable</b>.</li><li>Nome: <code>GROQ_API_KEY</code>; valor: sua chave. Salve.</li><li>Em <b>Deploys → Trigger deploy</b>, faça um novo deploy e volte aqui para testar.</li></ol>
+  <p className="muted">A chave fica apenas no servidor do Netlify. O plano gratuito tem limites por minuto e por dia, que o provedor pode alterar.</p></section>);
