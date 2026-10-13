@@ -18,7 +18,7 @@ export async function listModels(): Promise<string[]> {
   return (j.data || []).map((m: any) => String(m.id)).filter((id: string) => !/whisper|guard|tts|orpheus|playai|safeguard|embed/i.test(id)).sort();
 }
 export async function generate(model: string, system: string, user: string, temperature: number): Promise<string> {
-  const j = await call("/chat/completions", { method: "POST", body: JSON.stringify({ model, temperature, response_format: { type: "json_object" },
+  const j = await call("/chat/completions", { method: "POST", body: JSON.stringify({ model, temperature, max_tokens: 3000,
     messages: [{ role: "system", content: system }, { role: "user", content: user }] }) });
   return j?.choices?.[0]?.message?.content || "";
 }

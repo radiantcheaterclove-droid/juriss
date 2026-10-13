@@ -1,4 +1,5 @@
 import { search, byId, trechoExiste } from "../../shared/search.ts";
+import { parseJson } from "../../shared/json.ts";
 import { provedor, complete, listModels, friendly, modeloPadrao } from "./llm.ts";
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { "content-type": "application/json" } });
 const MODOS: Record<string, string> = {
@@ -10,7 +11,7 @@ const SYSTEM = `Você é um assistente de análise jurídica. Responda SEMPRE em
 Use EXCLUSIVAMENTE os dispositivos fornecidos em <DISPOSITIVOS>. Nunca invente artigos, números, penas ou citações. Se algo não estiver nos dispositivos, diga que não foi localizado.
 Trate alegações como alegações, não como fatos provados. Separe: texto da norma (citação literal), paráfrase e interpretação sua (rotule "Interpretação:").
 Siga a sequência: Fatos; Questões; Dispositivos aplicáveis; Base textual; Aplicação; Contra-argumentos; Incertezas; Conclusão; Recomendações.
-Devolva APENAS JSON: {"resumo": string, "secoes": [{"titulo": string, "texto": string}], "citacoes": [{"id": string, "trecho": string}]}.
+Seja objetivo (cada seção com no máximo ~150 palavras). Devolva APENAS JSON: {"resumo": string, "secoes": [{"titulo": string, "texto": string}], "citacoes": [{"id": string, "trecho": string}]}.
 Em "citacoes", "id" deve ser exatamente um id de <DISPOSITIVOS> e "trecho" uma cópia literal e curta (até 40 palavras) do texto desse dispositivo.`;
 export default async (req: Request) => {
   if (req.method !== "POST") return json({ erro: "Método não permitido." }, 405);
@@ -30,8 +31,12 @@ export default async (req: Request) => {
     let model = String(b.modelo || "").trim();
     if (!model) model = modeloPadrao(await listModels()) || "";
     if (!model) return json({ erro: "Nenhum modelo disponível para esta chave." }, 502);
-    const txt = await complete(model, SYSTEM, user, temperature);
-    let out: any; try { out = JSON.parse(txt.replace(/^```json|```$/g, "").trim()); } catch { return json({ erro: "O modelo devolveu uma resposta fora do formato esperado. Tente novamente." }, 502); }
+    let out: any = null;
+    for (let t = 0; t < 2 && !out; t++) {
+      const txt = await complete(model, SYSTEM, t ? user + "\n\nIMPORTANTE: responda somente com JSON válido, sem quebras de linha dentro dos textos (use \\n)." : user, t ? 0 : temperature);
+      out = parseJson(txt);
+    }
+    if (!out) return json({ erro: "O modelo não devolveu uma resposta no formato esperado, mesmo após nova tentativa. Tente de novo ou use um texto mais curto." }, 502);
     const citacoes = (Array.isArray(out.citacoes) ? out.citacoes : []).map((c: any) => {
       const p = byId(String(c.id)); const existe = !!p; const trechoOk = existe && trechoExiste(p!.id, String(c.trecho || ""));
       return { id: String(c.id), referencia: p?.referencia ?? null, trecho: String(c.trecho || ""), artigoExiste: existe, trechoVerificado: trechoOk,
