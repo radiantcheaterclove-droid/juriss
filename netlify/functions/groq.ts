@@ -17,11 +17,11 @@ export async function listModels(): Promise<string[]> {
   const j = await call("/models");
   return (j.data || []).map((m: any) => String(m.id)).filter((id: string) => !/whisper|guard|tts|orpheus|playai|safeguard|embed/i.test(id)).sort();
 }
-export async function generate(model: string, system: string, user: string, temperature: number): Promise<string> {
-  const j = await call("/chat/completions", { method: "POST", body: JSON.stringify({ model, temperature, max_tokens: 3000,
-    messages: [{ role: "system", content: system }, { role: "user", content: user }] }) });
+export async function generate(model: string, system: string, user: string, temperature: number, maxTokens = 3000): Promise<string> {
+  const j = await call("/chat/completions", { method: "POST", body: JSON.stringify({ model, temperature, max_tokens: maxTokens,
+    messages: [{ role: "system", content: system }, { role: "user", content: user }] }) }, 22000, 1);
   return j?.choices?.[0]?.message?.content || "";
 }
 export const friendly = (e: any) => e.status === 401 || e.status === 403 ? "Chave do Groq inválida. Confira a variável GROQ_API_KEY no Netlify."
-  : e.status === 413 || /too large|tokens per minute/i.test(e.message || "") ? "O pedido excedeu o limite por minuto do plano gratuito. Use um texto menor ou aguarde um minuto."
-  : e.status === 429 ? "Limite do plano gratuito atingido. Aguarde alguns minutos e tente de novo." : e.message || "Falha ao consultar o Groq.";
+  : e.status === 413 || /too large|tokens per minute/i.test(e.message || "") ? "O pedido excedeu o limite por minuto do plano gratuito, mesmo reduzido. Aguarde 1 minuto e tente de novo, ou escolha outro modelo na lista. Detalhe do Groq: " + String(e.message || "").slice(0, 220)
+  : e.status === 429 ? "Limite do plano gratuito atingido. Aguarde alguns minutos e tente de novo. Detalhe do Groq: " + String(e.message || "").slice(0, 220) : e.message || "Falha ao consultar o Groq.";

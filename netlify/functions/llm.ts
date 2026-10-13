@@ -4,8 +4,8 @@ export const provedor = (): "groq" | "gemini" | null => (groq.keyOk() ? "groq" :
 export const nomeProvedor = () => (provedor() === "groq" ? "Groq" : provedor() === "gemini" ? "Google Gemini" : "nenhum");
 export const listModels = () => (provedor() === "groq" ? groq.listModels() : gem.listModels());
 export const friendly = (e: any) => (provedor() === "groq" ? groq.friendly(e) : gem.friendly(e));
-export async function complete(model: string, system: string, user: string, temperature: number): Promise<string> {
-  if (provedor() === "groq") return groq.generate(model, system, user, temperature);
+export async function complete(model: string, system: string, user: string, temperature: number, maxTokens?: number): Promise<string> {
+  if (provedor() === "groq") return groq.generate(model, system, user, temperature, maxTokens);
   const r = await gem.generate(model, system, user, temperature);
   return r?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";
 }

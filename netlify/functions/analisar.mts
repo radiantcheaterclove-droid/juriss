@@ -23,20 +23,35 @@ export default async (req: Request) => {
   const modo = MODOS[b.modo] ? b.modo : "infracao";
   const temperature = Math.min(1, Math.max(0, Number(b.temperatura ?? 0.2)));
   const ctx = `${pergunta}\n${fatos}\n${b.artigos || ""}`;
-  const achados = search(ctx, 6);
-  if (!achados.length) return json({ erro: "Nenhum dispositivo relevante foi localizado nos documentos. A análise não será gerada sem base textual." }, 422);
-  const disp = achados.map((p) => `<DISPOSITIVO id="${p.id}" ref="${p.referencia}" capitulo="${p.capitulo}">\n${p.texto.slice(0, 1800)}\n</DISPOSITIVO>`).join("\n");
-  const user = `Tipo de análise: ${MODOS[modo]}\nPergunta: ${pergunta}\nFatos (alegados): ${fatos}\nPessoas/funções: ${b.pessoas || "-"}\nViolações alegadas: ${b.violacoes || "-"}\nArtigos indicados: ${b.artigos || "-"}\nProvas: ${b.provas || "-"}\n\n<DISPOSITIVOS>\n${disp}\n</DISPOSITIVOS>`;
+  const todos = search(ctx, 6);
+  if (!todos.length) return json({ erro: "Nenhum dispositivo relevante foi localizado nos documentos. A análise não será gerada sem base textual." }, 422);
+  const NIVEIS = [{ n: 4, c: 1300, mt: 1800 }, { n: 2, c: 800, mt: 1200 }];
+  const montar = (nv: { n: number; c: number }) => {
+    const ach = todos.slice(0, nv.n);
+    const disp = ach.map((p) => `<DISPOSITIVO id="${p.id}" ref="${p.referencia}" capitulo="${p.capitulo}">\n${p.texto.slice(0, nv.c)}\n</DISPOSITIVO>`).join("\n");
+    return { ach, user: `Tipo de análise: ${MODOS[modo]}\nPergunta: ${pergunta}\nFatos (alegados): ${fatos}\nPessoas/funções: ${b.pessoas || "-"}\nViolações alegadas: ${b.violacoes || "-"}\nArtigos indicados: ${b.artigos || "-"}\nProvas: ${b.provas || "-"}\n\n<DISPOSITIVOS>\n${disp}\n</DISPOSITIVOS>` };
+  };
+  let achados = todos;
   try {
     let model = String(b.modelo || "").trim();
     if (!model) model = modeloPadrao(await listModels()) || "";
     if (!model) return json({ erro: "Nenhum modelo disponível para esta chave." }, 502);
-    let out: any = null;
-    for (let t = 0; t < 2 && !out; t++) {
-      const txt = await complete(model, SYSTEM, t ? user + "\n\nIMPORTANTE: responda somente com JSON válido, sem quebras de linha dentro dos textos (use \\n)." : user, t ? 0 : temperature);
-      out = parseJson(txt);
+    let out: any = null, ultimo: any = null;
+    for (const nv of NIVEIS) {
+      const m = montar(nv); achados = m.ach;
+      for (let t = 0; t < 2 && !out; t++) {
+        try {
+          const txt = await complete(model, SYSTEM, t ? m.user + "\n\nIMPORTANTE: responda somente com JSON válido, sem quebras de linha dentro dos textos (use \\n)." : m.user, t ? 0 : temperature, nv.mt);
+          out = parseJson(txt);
+        } catch (e: any) {
+          ultimo = e;
+          if (e.status === 413 || e.status === 429 || /tokens per minute|too large/i.test(e.message || "")) break;
+          throw e;
+        }
+      }
+      if (out) break;
     }
-    if (!out) return json({ erro: "O modelo não devolveu uma resposta no formato esperado, mesmo após nova tentativa. Tente de novo ou use um texto mais curto." }, 502);
+    if (!out) { if (ultimo) throw ultimo; return json({ erro: "O modelo não devolveu uma resposta no formato esperado, mesmo após nova tentativa. Tente de novo ou use um texto mais curto." }, 502); }
     const citacoes = (Array.isArray(out.citacoes) ? out.citacoes : []).map((c: any) => {
       const p = byId(String(c.id)); const existe = !!p; const trechoOk = existe && trechoExiste(p!.id, String(c.trecho || ""));
       return { id: String(c.id), referencia: p?.referencia ?? null, trecho: String(c.trecho || ""), artigoExiste: existe, trechoVerificado: trechoOk,
